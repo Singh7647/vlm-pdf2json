@@ -1,0 +1,1489 @@
+Visual Adversarial Attack on Vision-Language Models for
+Autonomous Driving
+Tianyuan Zhang1, Lu Wang1, Xinwei Zhang1, Yitong Zhang1, Boyi Jia1,
+Siyuan Liang2, Shengshan Hu3, Qiang Fu1, Aishan Liu1, Xianglong Liu1
+1Beihang University, China
+2National University of Singapore, Singapore
+3Huazhong University of Science and Technology, China
+Abstract
+Vision-language models (VLMs) have significantly ad-
+vanced autonomous driving (AD) by enhancing reasoning
+capabilities.
+However, these models remain highly vul-
+nerable to adversarial attacks.
+While existing research
+has primarily focused on general VLM attacks, the devel-
+opment of attacks tailored to the safety-critical AD con-
+text has been largely overlooked. In this paper, we take
+the first step toward designing adversarial attacks specifi-
+cally targeting VLMs in AD, exposing the substantial risks
+these attacks pose within this critical domain. We iden-
+tify two unique challenges for effective adversarial attacks
+on AD VLMs: the variability of textual instructions and
+the time-series nature of visual scenarios. To this end, we
+propose ADvLM, the first visual adversarial attack frame-
+work specifically designed for VLMs in AD. Our frame-
+work introduces Semantic-Invariant Induction, which uses
+a large language model to create a diverse prompt li-
+brary of textual instructions with consistent semantic con-
+tent, guided by semantic entropy.
+Building on this, we
+introduce Scenario-Associated Enhancement, an approach
+where attention mechanisms select key frames and perspec-
+tives within driving scenarios to optimize adversarial per-
+turbations that generalize across the entire scenario. Exten-
+sive experiments on several AD VLMs over multiple bench-
+marks show that ADvLM achieves state-of-the-art attack ef-
+fectiveness. Moreover, real-world attack studies further val-
+idate its applicability and potential in practice.
+1. Introduction
+Owing to their strong generalization capabilities and in-
+herent interpretability, vision-language models (VLMs)
+have demonstrated exceptional performance across various
+tasks, including autonomous driving (AD). By enabling au-
+tonomous systems to comprehend scenarios and process
+Benign Image
+Normal
+Driving
+Collision
+Adversarial Image
+AD with VLM
+How should the vehicle
+move next?
+User Instruction
+Action: Steer to the left. 
+Speed (20 mph), angle (12°).
+Reason: I am applying left 
+turn as the road heading to the 
+left and no pedestrian….
+Action: Turn right and speed
+up. Speed (40 mph), angle (-12°), 
+brake pedal (0%).
+Reason: I am applying the left 
+turn acceleration as observing the 
+green light….
+Figure 1. Illustration of ADvLM, where visual attacks lead model
+to generate incorrect decisions, demonstrating the potential risks
+associated with adversarial vulnerabilities in VLMs for AD.
+natural language, VLMs could serve as the brain and of-
+fer effective solutions for advanced reasoning in complex
+scenarios and more efficient human-machine interaction
+[3, 40, 45, 55].
+As a novel solution in end-to-end AD,
+VLMs present significant potential for future development.
+However, VLMs exhibit significant vulnerabilities and
+lack robustness, particularly when faced with carefully
+crafted visual perturbations such as adversarial attacks [11,
+14, 15, 17–20, 26, 32, 34–37, 52, 53, 56–58]. While various
+attack methods have been proposed, most existing research
+focuses on general VLMs and has not specifically addressed
+the unique requirements of AD. Identifying and addressing
+these vulnerabilities is essential in safety-critical domains
+like AD, as failures in VLMs could lead to severe con-
+sequences, including accidents or compromised decision-
+making.
+In this paper, we take the first step to study adversarial
+attacks on VLM for AD. However, it is highly non-trivial to
+simply extend current adversarial attacks on general VLMs
+to this scenario, where We posit two key challenges unique
+arXiv:2411.18275v1  [cs.CV]  27 Nov 2024
+
+in VLM for AD as follows. ❶Attack should work among
+varied textual instructions with different phrases/sentences
+that convey the same task semantics.
+❷Attack should
+work for a specific time-series driving scenario with mul-
+tiple visual frames and perspective shifts. To address these
+challenges, we propose ADvLM, the first visual adversar-
+ial attack framework specifically tailored for VLMs in au-
+tonomous driving. In the textual modality, we propose the
+Semantic-Invariant Induction where we construct a low-
+semantic-entropy prompts library containing diverse textual
+instructions with the same semantics. Specifically, we em-
+ploy a large language model to generate prompt variants
+from a seed and then refine them to promote the diver-
+sity in expressions guided by semantic entropy. In the vi-
+sual modality, we introduce Scenario-Associated Enhance-
+ment, where we select critical frames/perspectives within
+the driving scenario based on model attentions, and further
+optimize the adversarial perturbations based on the pivotal
+frames while traversing the prompts library, such that the
+attack can generalize over the whole scenario. In this way,
+we can generate adversarial attacks across an expanded text
+and image input space, resulting in attacks that can remain
+effective and induce targeted behaviors across both varied
+instructions and time-series viewpoints in VLMs for AD.
+To demonstrate its efficacy, we conduct extensive exper-
+iments on several VLMs for AD over multiple datasets,
+where our attack significantly outperforms other base-
+lines with the highest Final Score reduction (+16.97% and
+7.49%) in both white-box and black-box settings. In the
+closed-loop evaluation associated with the simulation en-
+vironment CARLA, ADvLM also proves most effective,
+yielding a Vehicle Collisions Score of 2.954. In addition,
+we conduct real-world studies on physical vehicles to fur-
+ther demonstrate the potential of our attacks. Our contribu-
+tions are shown as:
+• We propose ADvLM, the first adversarial attack specifi-
+cally designed for VLMs in AD, addressing the unique
+challenges inherent in AD.
+• We introduce Semantic-Invariant Induction in the textual
+domain and Scenario-Associated Enhancement in the vi-
+sual domain, ensuring attack effectiveness across varied
+instructions and sequential viewpoints.
+• Extensive experiments in both the digital and physical
+worlds demonstrate that ADvLM outperforms existing
+methods and shows high potential in practice.
+2. Related Works
+Adversarial Attacks on VLMs. With the widespread de-
+ployment and outstanding performance of VLMs in mul-
+timodal question answering and reasoning, their robust-
+ness [21, 29, 58] has gradually attracted attention in recent
+years. Prior to our work, researchers have explored adver-
+sarial attacks against general VLMs. Due to the multimodal
+nature of VLMs, most adversarial attacks involve perturba-
+tions applied simultaneously to both image and text modal-
+ities. Drawing inspiration from adversarial attacks in vi-
+sion tasks [10, 16, 22–28, 33, 48, 59, 64, 65], these meth-
+ods [12, 13, 47, 49, 54, 60, 62] typically rely on end-to-
+end differentiable gradients. [60] introduced the first mul-
+timodal adversarial attack on VLMs, which paved the way
+for subsequent attacks that began exploring more practical
+black-box settings [7, 56, 67]. Researchers typically aim for
+attack methods that introduce minimal perturbations while
+having a strong impact, leading some studies to focus solely
+on attacking the visual modality of VLMs. [2, 61, 63, 66]
+demonstrate that it is possible to attack specific targets us-
+ing only image-based perturbations successfully. Adversar-
+ial attacks that target only the text modality are uncommon
+in VLMs, as they primarily focus on large language models.
+Despite the development of various adversarial attack
+techniques for general VLMs, there is a notable lack of
+methods specifically addressing the robustness of VLMs in
+the safety-critical context of AD.
+VLMs in Autonomous Driving. Recent research has in-
+creasingly focused on VLMs as a means to tackle AD tasks
+by integrating both visual and linguistic inputs. These mod-
+els excel in tasks like perception, reasoning, and planning,
+which are essential for AD systems. The tasks of AD VLMs
+can be primarily categorized into two types. The first is
+the core function of VLMs, namely VQA, such as the clas-
+sic Reason2Drive [42], LingoQA [41] and Dolphins [38].
+These foundational works thoroughly explore the enhanced
+role of VLMs in AD, particularly their meticulous reason-
+ing and explanatory abilities in various driving-related tasks
+such as scene understanding, behavior prediction, and dia-
+logue. The second is driving planning or control, closely
+related to the operations of AD. GPT-Driver [40], Driving
+with LLMs [3], and MTD-GPT [31] pioneered improve-
+ments to VLMs for driving planning. However, these works
+only considered the driving problem in open-loop settings,
+overlooking issues such as cumulative errors and end-to-
+end interpretability. In contrast, LMDrive [45] is the first to
+propose a VLM-based driving method within closed-loop
+settings, addressing these critical limitations. Other meth-
+ods have integrated VQA and planning/control within VLM
+frameworks, offering a more holistic approach to AD. Driv-
+eLM [46], DriveMLM [50],m and DriveGPT4 [55] all go
+beyond basic conversations to implement more refined driv-
+ing control and decision-making reasoning.
+This paper selects representative models from each of the
+three categories for a comprehensive robustness analysis.
+3. Problem and Motivation
+Attack on VLMs. Adversarial attacks on VLMs for AD
+aim to manipulate a model’s output by introducing carefully
+crafted perturbations into the input data. Specifically, an ad-
+
+Turn left ahead.
+You’ll need to turn left soon.
+(a) Variability of textual instructions
+(b) Time-series nature of visual scenarios
+Figure 2. Illustration of the main challenges of attacks for VLMs
+in AD including the variability of textual instructions and the time-
+series nature of visual scenarios.
+versary applies adversarial perturbations to a benign query
+(V, t), where V ⊂Vall denotes a specific sequence of vi-
+sual inputs in AD, representing multiple frames rather than
+a single image. Here, Vall is the domain of all possible vi-
+sual inputs for the model. This results in an adversarial
+query P(V, t), where P(·) denotes the adversarial perturba-
+tion function. The goal of P is to induce the VLM, denoted
+Fθ, to output a targeted or undesirable response y∗instead
+of the intended benign response. This manipulation is for-
+mally defined by maximizing the likelihood of the response
+y∗under the adversarial input:
+max
+P
+log p(y∗|P(V, t)),
+(1)
+where p represents the probability function Fθ : Q →R,
+with Q = Vall × T as the input query domain, comprising
+sequences of visual inputs V ⊂Vall and textual inputs t ∈
+T, and R as the response domain. In this work, we primarily
+focus on attacks in the visual domain, ensuring generated
+perturbations remain consistent within the same sequence.
+Challenges and Attacking Goals. Common VLM ad-
+versarial attacks focus on fixed inputs (i.e., specific textual
+and visual input), but AD introduces unique challenges that
+require tailored approaches for effective attacks. We iden-
+tify two key challenges essential for effective adversarial
+attacks in AD (as shown in Fig. 2), which differ this attack
+from those for general VLMs.
+❶Variability of textual instructions. Drivers in AD often
+use varied textual instructions with different phrases for the
+same task, such as “turn left at the intersection” and “turn
+left ahead”. In other words, these instructions are shown in
+different phrases but convey the same semantics and intent.
+To ensure a stable attack, visual perturbations δ must remain
+effective across an expanded set of semantically equiva-
+lent prompts eT, derived from an original prompt, leading
+the VLM to consistently produce an incorrect response y∗
+across all prompts in eT that convey the same command.
+❷Time-series nature of visual scenarios. When driving,
+the vehicle’s perspective shifts frequently due to movement
+and environmental factors. AD models must adapt to visual
+changes from motion and temporal dependencies. Unlike
+static tasks, given an instruction, attacking AD VLMs de-
+mands the perturbations to make reliable impacts on a se-
+ries of frames even as perspectives and image quality vary.
+Let eV represent a collection of different perspectives gen-
+erated from an original frame in V, capturing the series of
+frames typical of time-series visual scenarios. This formu-
+lation ensures that the adversarial attack is effective across
+a dynamic visual sequence in an AD context.
+To sum up, the adversary should consider generating ad-
+versarial perturbations that induce the AD VLM to produce
+the targeted response y∗consistently as follows:
+δ = arg max
+X
+V
+X
+eT
+log p(y∗|ℵ(eV, δ), t),
+(2)
+where t ∈eT represents a specific prompt conveying the
+same semantic instruction, and eV ⊂V indicates selected
+frames from the set of generated perspectives. The func-
+tion ℵ(eV, δ) applies the perturbation δ uniformly across all
+frames in eV.
+Optimizing δ in this way ensures that the
+adversarial attack consistently misleads the model across
+varying perspectives and prompt formulations, thus enhanc-
+ing robustness within the AD scenario.
+Threat Model.
+The adversary’s capabilities are lim-
+ited to adding noise to image data, as interfering with the
+camera’s external inputs is easier than accessing the lan-
+guage module’s internal data. Given the sequential nature
+of AD, the adversary applies uniform noise δ⋆across the en-
+tire image sequence V, maintaining consistent perturbations
+within each sequence. The adversary’s knowledge differs
+by scenario, encompassing two primary AD threat models:
+white-box and black-box. In the white-box model, the ad-
+versary has full access to the model’s architecture, param-
+eters, and data flow, allowing targeted exploitation of the
+model’s vulnerabilities. In contrast, the black-box model
+limits the adversary to indirect interactions, lacking insight
+into the model’s internal workings and requiring reliance on
+external observations. We assess ADvLM under these sce-
+narios through open-loop and closed-loop experiments for
+the white-box setting (c.f. Sec. 5.2) and open-loop experi-
+ments for the black-box setting (c.f. Sec. 5.3).
+4. Approach
+To address the above challenges, we propose ADvLM,
+which exploits both the textual and visual modalities us-
+ing proposed Semantic-Invariant Induction and Scenario-
+Associated Enhancement (as shown in Fig. 3).
+
+Semantic-Invariant Induction
+Textual Modality
+Penalty Function
+1
+2
+3
+4
+5
+Variants
+Generation
+Variant 2
+Variant 3
+Variant 4
+Variant 1
+Variant 5
+Variant 2
+Variant 1
+Variant 3
+Initial 
+Prompt
+Variant
+Selection
+Initial Prompts
+Generated Prompts
+…
+LSE Prompts Library
+min Semantic Entropy
+Question: What potential moves can
+the self-driving vehicle make based on
+<c1,CAM_FRONT_LEFT,231.5,472.1
+>? Why choose this move and what is
+the probability of it happening?
+Answer: The action is to keep going at
+the same speed, the reason is that there
+is no safety issue. The probability of
+this action is high.
+ADvLM Framework
+Answer: remain remain remain remain
+remain remain remain remain remain …
+Question
+Visual Modality
+Scenario-Associated Enhancement
+Scene
+optimize
+Different Viewpoints
+Pivotal Frames Choose
+LSE Prompts Library
+Lossimage
+Lossimage
+Lossimage
+Lossimage
+Limage
+Lscene
+Benign 
+Image
+AD with VLM
+AD with VLM
+AD with VLM
+AD with VLM
+Lattack
+Figure 3. The ADvLM Framework. ADvLM introduce Semantic-Invariant Induction in the textual domain and Scenario-Associated En-
+hancement in the visual domain, ensuring attack effectiveness across varied instructions and sequential viewpoints.
+4.1. Semantic-Invariant Induction
+In the textual modality, we introduce Semantic-Invariant In-
+duction to construct a low-semantic-entropy (LSE) prompts
+library eTLSE containing diverse textual instructions with
+consistent semantic intent. Specifically, this approach lever-
+ages semantic entropy [6] to refine prompts generated from
+an initial seed, promoting expression diversity while retain-
+ing the same underlying meaning.
+We employ GPT-4V [1] to generate semantically equiv-
+alent variants for each input t. For each generated ti, we
+compute its semantic entropy SE(ti), aiming to achieve low
+entropy while enhancing expression variability. To guide
+this, we introduce a penalty function B(t, ti), balancing se-
+mantic consistency and expression diversity:
+B(t, ti) = SE(ti) + β · D(t, ti),
+(3)
+where D(t, ti) calculates expression similarity using
+Word2Vec embeddings [4] and cosine similarity:
+D(t, ti) = 1 −
+Φ(t) · Φ(ti)
+∥Φ(t)∥∥Φ(ti)∥,
+(4)
+with Φ(x) representing the Word2Vec embedding of x. The
+hyperparameter β controls the trade-off between entropy re-
+duction and semantic alignment. The LSE prompt library
+for t is then defined as:
+eTLSE =
+[
+t∈T
+{ti | VLM(ti), min B(t, ti)}.
+(5)
+This approach ensures expression diversity with mini-
+mized semantic entropy, creating a robust text modality to
+support effective adversarial attacks across varied AD in-
+structions.
+4.2. Scenario-Associated Enhancement
+In the visual modality, we introduce Scenario-Associated
+Enhancement (SAE) to enhance attack robustness across
+both textual instructions and visual frames in AD scenarios.
+Based on model attention, this method focuses on critical
+frames and perspectives identified within the driving sce-
+nario. The attack achieves generalization across the driving
+scenarios by refining adversarial perturbations for these piv-
+otal frames while iterating through the LSE prompts library.
+To ensure robustness across viewpoints, we design the
+image-wise loss Limage with perspective transformations
+T (V) applied to each visual input series V. This function
+ensures that the perturbations remain effective under diverse
+visual perspectives. The Limage is defined as:
+Limage(V, t) = −
+X
+ti∈S(eTLSE,t)
+log p(y∗|P(T (V), ti),
+(6)
+where eTLSE represents the low-semantic-entropy prompt
+set, ensuring robustness across diverse textual inputs. The
+function S(·, ·) selects prompts with the same semantic
+meaning but different phrasings.
+To identify pivotal frames, we use an iterative attention-
+based selection process that maximizes diversity in atten-
+
+tion maps across frames, enhancing scene coverage. Start-
+ing with the first frame v1 in sequence V as the reference,
+we calculate the similarity between attention maps of each
+unselected frame vi and the mean attention maps of the se-
+lected frames, using a similarity metric (average of SSIM
+[51] and PCC). For each candidate frame vi, we compute:
+Sim(vi, eV) = Sim
+
+A(vi), 1
+|eV|
+X
+v∈eV
+A(v)
+
+,
+(7)
+where Sim(·, ·) measures similarity, and eV is the set of se-
+lected frames. The next frame is chosen by minimizing the
+similarity to the set eV:
+vnew = arg minvi∈V\eVSim(vi, eV).
+(8)
+This selection continues until the desired number of
+frames |eV| is reached, ensuring each frame introduces dis-
+tinct visual information.
+Lastly, we apply a scene-wise loss Lscene to optimize per-
+turbations across these selected frames for enhanced gener-
+alization across varied environments:
+Lscene(V, t) = −
+X
+eV⊂V
+X
+ti∈S(eTLSE,t)
+log p(y∗|P(eV, ti)).
+(9)
+4.3. Overall Attack Process
+The primary objective of this attack is to minimize the loss
+Lattack, ensuring that the perturbation remains effective de-
+spite variations in both text and perspective, thereby ex-
+panding the adversarial space and enhancing robustness.
+The combined loss function is defined as:
+Lattack = (1 −λ) · Limage + λ · Lscene,
+(10)
+where λ controls the contribution of the Lscene. To balance
+the influence between image-wise and scene-wise losses,
+we set the hyper-parameter λ to 0.4.
+5. Experiments
+5.1. Experimental Settings
+Target Models. We select 3 state-of-the-art VLM-based
+AD models for attack including DriveLM [46], Dolphins
+[38], and LMDrive [45].
+In addition, we also evaluate
+our attacks on 4 general VLMs including MiniGPT-4 [68],
+MMGPT [8], LLaVA [30], and GPT-4V [1].
+Evaluation Datasets. We evaluate our approach under
+both open-loop and closed-loop settings.
+For open-loop
+conditions, we use the DriveLM-ADvLM and Dolphins-
+ADvLM datasets, which are expanded from Drivelm-
+nuScenes [46] and Dolphins Benchmark [38]. For closed-
+loop conditions, we use the LangAuto-Tiny benchmark [45]
+scenarios, and CARLA simulators generate the input data
+based on these scenarios.
+Evaluation Metrics. For DriveLM and Dolphins, we
+calculate a weighted average of language metrics and GPT-
+Score, following the approach in [46] and [38]. For closed-
+loop conditions, we use metrics provided by the CARLA
+leaderboard [5]. Given that linguistic quality is less criti-
+cal in AD systems, we reduced the weight of the Language
+Score and adjusted the other metrics to create a New Final
+Score in the evaluation of DriveLM. ↓indicates the lower
+the better attack, while ↑indicates higher the better.
+Attack baselines. We choose 2 classical adversarial at-
+tacks including FGSM [9], PGD [39], and 2 commonly
+adopted attacks on VLMs (AttackVLM [66], and AnyAt-
+tack [61]) for comparison.
+Implementation Details. For our ADvLM, we empiri-
+cally set λ = 0.4, with ϵ = 0.1, n = 50 and α = 2 ∗ϵ/n.
+All code is implemented in PyTorch, and experiments are
+conducted on an NVIDIA A800-SXM4-80GB GPU cluster.
+More details about our experimental settings can be
+found in the Supplementary Material.
+5.2. White-box Attack
+We first perform white-box attacks in both the open-loop
+(static, controlled environment with predefined inputs) and
+closed-loop scenarios (dynamic, interactive environment
+with real-time feedback and model adaptation).
+Open-loop Evaluation.
+For the number of pivotal
+frames, we set |eV| = 6 for the Dolphins model, which pro-
+cesses video frames as input. For DriveLM, which oper-
+ates on single images rather than consecutive frames, we
+use |eV| = 1. The attack results are presented in Tab. 1,
+leading to the following observations.
+❶Our ADvLM method achieves significantly better per-
+formance on different models (a maximum final score drop
+by 16.97% on DriveLM and 9.64% on Dolphins).
+❷We observed that AttackVLM and AnyAttack perform
+comparatively worse than other baselines. We hypothesize
+that this may be due to these methods being primarily de-
+signed for black-box attacks, leading to lower effectiveness
+in white-box settings.
+Therefore, we conduct additional
+black-box attack experiments in Sec. 5.3.
+❸In the evaluation of Dolphins, the performance of AD-
+vLM on Time tasks is slightly lower than that of PGD. De-
+tailed experiments indicate that adjusting the hyperparame-
+ter λ can effectively enhance performance on the Time task.
+For more information, please refer to Sec. 5.4.
+❹Notably, in the evaluation of DriveLM, ADvLM re-
+duces the Language Score by 13.20%, which is less than
+the 17.96% drop achieved by the PGD method. This does
+not indicate weaker attack effectiveness; rather, since the
+Language Score reflects linguistic quality, a higher score
+can make it harder for drivers to detect the attack, poten-
+
+Table 1. Evaluation results under open-loop conditions. Bold text
+indicates the method with the strongest attack effect in each col-
+umn. Gray cells represent comprehensive evaluation metrics.
+(a) DriveLM
+Method/Metrics
+Accuracy↓
+Chatgpt↓
+Match↓
+Language↓
+Final↓
+Final†↓
+Raw
+71.43
+66.60
+31.73
+46.39
+56.55
+53.62
+FGSM [9]
+73.81
+67.26
+32.28
+39.44
+56.01
+54.58
+PGD [39]
+61.90
+48.45
+25.20
+28.43
+42.49
+41.84
+AttackVLM [66]
+70.12
+63.81
+30.15
+42.50
+54.08
+51.61
+AnyAttack [61]
+71.20
+64.05
+30.95
+43.10
+54.67
+52.24
+ADvLM
+52.38
+43.73
+24.86
+33.19
+39.58
+37.92
+† New Final Score.
+(b) Dolphins
+Method/Metrics
+Weather↓
+Traffic.↓
+Time↓
+Scene↓
+Open.↓
+Desc↓
+Final↓
+Raw
+48.75
+52.82
+39.71
+43.31
+29.79
+41.37
+42.63
+FGSM [9]
+47.27
+52.99
+46.62
+45.46
+23.60
+45.71
+43.61
+PGD [39]
+32.43
+40.67
+36.51
+33.04
+22.15
+36.83
+33.60
+AttackVLM [66]
+44.32
+50.60
+41.12
+43.25
+28.98
+42.51
+41.96
+AnyAttack [61]
+45.10
+51.12
+43.28
+44.10
+27.25
+43.14
+42.28
+ADvLM
+31.09
+41.06
+39.36
+32.60
+17.44
+36.45
+32.99
+Table 2. Evaluation Results under closed-loop conditions. Bold
+text indicates the most effective attack in each column.
+Method/Metrics
+Infraction.↓
+Vehicle.↑
+Layout.↑
+Red lights.↑
+Off-road.↑
+Raw
+0.787
+0.832
+1.989
+0.654
+1.437
+FGSM [9]
+0.721
+0.663
+4.494
+0.785
+4.577
+PGD [39]
+0.608
+1.454
+5.704
+1.321
+5.203
+AttackVLM [66]
+0.775
+0.810
+1.950
+0.670
+1.450
+AnyAttack [61]
+0.780
+0.820
+1.980
+0.660
+1.420
+ADvLM
+0.599
+2.954
+6.869
+1.473
+5.188
+tially delaying their intervention. We provided a detailed
+explanation in the Supplementary Material.
+Closed-loop Evaluation.
+For the closed-loop evalua-
+tion, we used the pre-trained model provided by LMDrive
+[45]. Since LMDrive operates on single images rather than
+consecutive frames, we set |eV| = 1. The evaluation pipeline
+follows these steps: ❶start the Docker version of CARLA
+0.9.10.1, ❷launch the CARLA leaderboard with a specified
+agent, and ❸activate drive mode and begin the evaluation.
+Due to variability in traffic flow and decision-making, the
+results can be unstable; therefore, we averaged the results
+over multiple trials. Each experimental setting was run five
+times, with metrics reported as the average of these repeti-
+tions. The evaluation results are shown in Tab. 2.
+Our ADvLM method outperforms all other attack meth-
+ods, achieving a 23.88% reduction in infraction penalty,
+with increases in collisions with vehicles and layout. No-
+tably, the performance of ADvLM on off-road infractions is
+within 0.5% lower than PGD, likely due to the higher sen-
+sitivity of PGD to specific boundary conditions. However,
+this is a minor difference compared to the overall improve-
+ments achieved by ADvLM across other metrics.
+Additionally, we present visualizations from the exper-
+iment on Town 03 Route 26 in Fig. 4. Before the attack,
+the vehicle navigated normally; however, after the attack, it
+veered into a gas station, posing a significant safety risk and
+underscoring potential security vulnerabilities.
+Figure 4. Closed-loop exp in Town 03 Route 26 of CARLA. After
+the attack (Green →Red), the vehicle veers towards the gas sta-
+tion, highlighting real-world potential safety risks.
+5.3. Black-box Evaluation
+Black-box Settings. In contrast to the white-box set-
+ting, where an adversary has full access to model details,
+the black-box scenario limits the attacker to model in-
+put/output, without insight into the model’s internal struc-
+ture. Our black-box evaluation is conducted in open-loop
+experiments, where we adapt the models and datasets of
+DriveLM [46] and Dolphins [38] in novel ways to enable
+transfer-based attacks. Specifically, we use Dolphins as the
+victim model with DriveLM as the substitute model, apply-
+ing the Dolphins-ADvLM dataset and white-box Dolphins
+for attack generation and performing attacks on DriveLM.
+The same approach is used for DriveLM in the black-box
+setting.
+We employ transfer-based methods for ADvLM,
+FGSM, and PGD, while directly implementing AttackVLM
+[66] and AnyAttack [61], as these methods are inherently
+designed for black-box environments.
+Results Analysis. The black-box evaluation results are
+provided in Tab. 3a and Tab. 3b, using the same metrics
+as outlined in Sec. 5.1.
+The findings reveal that across
+both DriveLM and Dolphins models, ADvLM consistently
+achieves lower Final Scores than other methods, with reduc-
+tions of up to 7.49% on DriveLM and 3.09% on Dolphins.
+This significant performance decline across varied datasets
+demonstrates the high effectiveness of ADvLM in degrading
+model performance in black-box settings, establishing it as
+a robust approach for transfer-based adversarial attacks.
+Attack on General VLMs. We also conducted exper-
+iments on general VLMs (i.e., MiniGPT-4 [68], MMGPT
+[8], LLaVA [30], and GPT-4V [1]) using DriveLM-
+ADvLMwith attack noise generated from DriveLM. Results,
+shown in Tab. 3c and measured by Final Score↓, reveal that
+while general-purpose models perform acceptably in AD
+tasks, there is a substantial performance gap compared to
+VLMs specifically designed for AD. In terms of attack ef-
+fectiveness, ADvLM, AttackVLM, and AnyAttack exhibit
+the strongest impact, demonstrating that our method effec-
+tively compromises general VLMs as well.
+
+Table 3. Evaluation results under black-box settings. Bold text in-
+dicates the method with the strongest attack effect in each column.
+Gray cells represent comprehensive evaluation metrics.
+(a) Results on DriveLM-ADvLM use DriveLM: Transfer from Dolphins
+Method/Metrics
+Accuracy↓
+Chatgpt↓
+Match↓
+Language↓
+Final↓
+Final†↓
+Raw
+71.43
+66.60
+31.73
+46.39
+56.55
+53.62
+FGSM [9]
+69.61
+60.33
+27.29
+46.12
+51.74
+48.97
+PGD [39]
+69.44
+61.07
+27.19
+41.74
+52.10
+49.19
+AttackVLM [66]
+70.12
+63.81
+30.15
+42.50
+54.08
+51.61
+AnyAttack [61]
+71.20
+64.05
+30.95
+43.10
+54.67
+52.24
+ADvLM
+66.25
+56.24
+23.91
+42.64
+49.06
+45.31
+† New Final Score.
+(b) Results on Dolphins-ADvLM use Dolphins: Transfer from DriveLM
+Method/Metrics
+Weather↓
+Traffic.↓
+Time↓
+Scene↓
+Open.↓
+Desc↓
+Final↓
+Raw
+48.75
+52.82
+39.71
+43.31
+29.79
+41.37
+42.63
+FGSM [9]
+48.62
+51.34
+38.74
+40.16
+27.00
+41.10
+41.16
+PGD [39]
+48.01
+52.79
+38.46
+38.58
+24.87
+40.46
+40.53
+AttackVLM [66]
+44.32
+50.60
+41.12
+43.25
+28.98
+42.51
+41.96
+AnyAttack [61]
+45.10
+51.12
+43.28
+44.10
+27.25
+43.14
+42.28
+ADvLM
+43.83
+49.98
+39.17
+36.17
+28.70
+39.44
+39.54
+(c) Results on DriveLM-ADvLM use VLMs: Transfer from DriveLM
+Method/Model
+MiniGPT-4 [68]
+MMGPT [8]
+LLaVA [30]
+GPT-4V [1]
+Raw
+46.23
+45.58
+48.77
+49.89
+FGSM [9]
+41.12
+43.83
+42.18
+44.63
+PGD [39]
+35.47
+41.28
+37.82
+39.54
+AttackVLM [66]
+30.13
+38.21
+33.57
+36.92
+AnyAttack [61]
+31.93
+39.02
+31.23
+34.83
+ADvLM
+30.52
+37.43
+30.83
+35.13
+0
+3
+5
+10
+20
+50
+100
+Iteraiton Steps
+0
+10
+20
+30
+40
+50
+60
+70
+80
+90
+Metrics (%)
+DriveLM
+Dolphins
+LMDrive
+(a) Different Steps
+0
+0.01
+0.02
+0.05
+0.1
+0.2
+0.4
+Perturbation Budgets
+0
+10
+20
+30
+40
+50
+60
+70
+80
+90
+Metrics (%)
+DriveLM
+Dolphins
+LMDrive
+(b) Different Budgets
+Figure 5. Experiments results under different steps and budgets.
+The main experiment settings are marked with black dashed lines.
+5.4. Ablation Studies
+Perturbation Budgets and Step Sizes. We conducted
+an ablation study to explore the impact of different attack
+settings. First, we present the results of ADvLM attacks
+with varying iteration steps n (i.e., 3, 5, 10, 20, 50, 100)
+on DriveLM-ADvLM and Dolphins-ADvLM, using a fixed
+perturbation budget of ϵ = 0.1 and step size α = 2ϵ/n.
+Generally, the attack strength increases with more iteration
+steps, as shown in Fig. 5a. Additionally, we tested AD-
+vLM with different perturbation budgets ϵ (i.e., 0.01, 0.02,
+0.05, 0.1, 0.2, 0.4) across three models, with n = 50 and
+α = 2ϵ/n. The specific budgets and results are shown in
+Fig. 5b. For DriveLM and Dolphins, we evaluate perfor-
+mance using the Final Score↓, while for LMDrive, we use
+the Infraction Score↓. The results indicate that as n and ϵ
+increase, attack effectiveness improves but levels off when
+n = 50 and ϵ = 0.1. Therefore, we selected these values.
+Semantic-Invariant Induction. We conducted experi-
+1
+2
+3
+4
+5
+Prompts Num
+0
+10
+20
+30
+40
+50
+60
+Final Score (%)
+57.1
+54.8
+52.4
+51.2
+50.0
+34.0
+34.0
+33.0
+33.0
+32.9
+DriveLM
+Dolphins
+(a) With SAE.
+1
+2
+3
+4
+5
+Prompts Num
+0
+10
+20
+30
+40
+50
+60
+Final Score (%)
+55.8
+53.6
+51.8
+50.1
+49.2
+33.3
+33.0
+32.4
+32.2
+32.2
+DriveLM
+Dolphins
+(b) Without SAE.
+Figure 6. Results under different numbers of prompts.
+ments with different numbers of prompts (i.e., 1, 2, 3, 4,
+and 5), using iteration steps n = 5 and ϵ = 0.1. Results
+are shown in Fig. 6a. As the number of prompts increases,
+attack effectiveness improves. When prompts are increased
+from 1 to 3, the Final Score↓of DriveLM and Dolphins de-
+creases from 57.14% and 33.99% to 52.38% and 33.03%,
+respectively. However, this improvement becomes marginal
+beyond 3 prompts, with accuracy only slightly decreasing
+to 50.0% and 32.88% at 5 prompts. We believe that three
+LSE prompts sufficiently capture the semantic information
+needed for effective attacks.
+Series-Associated Enhancement. We conducted exper-
+iments without the variable perspective technique, using the
+same setup as described previously but omitting the variable
+perspective method. Results are shown in Fig. 5b. The data
+shows a similar trend but with an average increase of 2.12%
+compared to the previous experiment. The experimental re-
+sults validated the effectiveness of the variable perspective.
+Hyper-parameter λ. We evaluate the effect of λ on Dol-
+phins using the Final Score↓, varying λ from 0.1 to 0.9 in
+steps of 0.1. Optimal attack performance occurs at λ = 0.4,
+though certain tasks, like Time, peak at λ = 0.6. This sen-
+sitivity to λ highlights λ’s role in tuning adversarial impact
+across tasks.
+The number of pivotal frames |eV|. We assess the influ-
+ence of |eV| on Dolphins using the Final Score↓, adjusting
+|eV| from 1 to 16 in increments of 1, as the longest scene in
+Dolphins consists of 16 frames per prompt. Results show
+that the optimal attack performance is achieved at |eV| = 6
+with 39.54, the lowest observed in the experiments. For
+other values, we observe less effective performance, such
+as 42.31 at |eV| = 4 and 41.67 at |eV| = 8, underscoring
+that 6 frames offer a balanced yet effective representation
+for inducing the most robust adversarial impact.
+5.5. Discussion and Analysis
+Analysis of Textual Instruction Variability. We con-
+duct experiments to assess the impact of textual vari-
+ability on attack effectiveness.
+Using the DriveLM-
+ADvLMdataset, which includes both standard prompts and
+sets of expanded, semantically equivalent prompts, we eval-
+
+Table 4. Analysis of textual instruction variability. Values in blue
+indicate the reduction relative to Raw.
+Datasets/Method
+Raw
+PGD [39]
+AttackVLM [66]
+AnyAttack [61]
+ADvLM
+DriveLM-ADvLM
+56.55
+42.49 / 14.06
+54.08 / 2.47
+54.67 / 1.88
+39.58 / 16.97
+DriveLM-ADvLM†
+56.79
+49.14 / 7.65
+54.78 / 2.01
+55.14 / 1.65
+44.78 / 11.01
+DriveLM-ADvLM‡
+57.16
+55.49 / 1.67
+55.35 / 1.81
+55.49 / 1.67
+50.54 / 6.62
+† Expanded to 3 semantically equivalent prompts per test case.
+‡ Expanded to 5 semantically equivalent prompts per test case.
+(a) Attention Map before Attack
+(b) Attention Map after Attack
+Figure 7. Results of the attention analysis.
+uate four attack methods (i.e., ADvLM, PGD, AnyAttack,
+and AttackVLM) under varied textual conditions. The eval-
+uation metric is Final Score↓, with the extended dataset
+tested by expanding each test case to include 3 and 5 seman-
+tically similar prompts, respectively, and calculating the fi-
+nal result as their average. As shown in Tab. 4, ADvLM
+consistently maintains high attack effectiveness across the
+expanded dataset, while other methods experience notable
+declines in performance as textual variability increases.
+Model Attention Analysis. This section analyzes model
+attention through qualitative and quantitative studies to un-
+derstand ADvLMmore thoroughly. Specifically, we exam-
+ine attention maps from DriveLM and LMDrive, comparing
+them before and after the attack. Qualitatively, as shown
+in Fig. 7a, models initially focus on similar regions across
+prompts and perspectives, while after applying ADvLM(see
+Fig. 7b), these attention maps shift significantly. Quanti-
+tatively, SSIM [51] and PCC metrics reveal high attention
+similarity across prompts and viewpoints before the attack
+(88.70% and 88.27% for DriveLM; 86.16% and 90.83% for
+LMDrive).
+Following the introduction of ADvLM, these
+values drop significantly (to 26.74% and 14.58% for Driv-
+eLM; 37.45% and 24.96% for LMDrive), confirming that
+ADvLM disrupts stable attention patterns effectively.
+6. Case Study for Real-World Attacks
+In this section, we test our ADvLM on a real-world AD ve-
+hicle to further reveal the potential risks.
+Experimental Setup. The experiment utilized a beta-
+version autonomous vehicle with a PIXLOOP-Hooke chas-
+sis [43]. This vehicle was outfitted with multiple percep-
+tion and motion modules, including an RGB camera LI-
+USB30-AR023ZWDR to execute navigational commands
+provided by the VLM (i.e., Dolphins). We use high-level
+commands like “go straight” to translate into specific re-
+sponses drive mode ctrl via the chassis. The prompt
+“go straight” was issued to the VLM. The environment and
+(a) Environment
+(b) First-view Perspective
+(c) Driving without attack
+(d) Driving with ADvLM attack
+Figure 8. Real-World Case Study of ADvLM Attack. (a) Experi-
+mental environment setup. (b) First-person view from the vehicle.
+(c) Normal driving without attack, with the vehicle following the
+intended path. (d) ADvLM attack effect, causing the vehicle to de-
+viate from its path, demonstrating potential real-world safety risks.
+first-person view images displayed in Fig. 8a and Fig. 8b.
+Real-time adversarial noise generation by ADvLM was ap-
+plied directly to the input, and the experiment was repeated
+10 times both w/ and w/o attacks in daylight conditions.
+Results and Interpretation. In trials influenced by AD-
+vLM, the vehicle deviated from its intended route in 70%
+of attempts, compared to 0% in clean trials. Normal and
+deviated driving images are shown in Fig. 8c and Fig. 8d.
+Analysis of logged data packets indicated that under AD-
+vLM ’s attack, the RGB camera failed to capture critical
+road features, leading to off-course commands. Among the
+7 successful attack-induced deviations, only 2 generated a
+warning and braking response within 0.5 seconds, signifi-
+cantly shorter than the average 2.5-second human reaction
+time [44]. These findings highlight the tangible risks posed
+by ADvLM to real-world AD systems.
+7. Conclusion and Limitations
+This paper introduces ADvLM, the first adversarial attack
+framework tailored specifically for VLMs in AD. ADvLM
+leverages Semantic-Invariant Induction within the textual
+domain and Scenario-Associated Enhancement within the
+visual domain, maintaining high attack effectiveness across
+diverse instructions and dynamic viewpoints. Extensive ex-
+periments demonstrate that ADvLM surpasses existing at-
+tack methods, highlighting substantial risks to AD systems.
+Limitations. Despite the promising results, several areas
+remain to be explored: ❶develop universal attack frame-
+works, ❷explore targeted attack potential, and ❸assess
+attack feasibility in additional or multimodal settings.
+References
+[1] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-
+mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,
+
+Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.
+Gpt-4 technical report.
+arXiv preprint arXiv:2303.08774,
+2023. 4, 5, 6, 7
+[2] Luke Bailey, Euan Ong, Stuart Russell, and Scott Emmons.
+Image hijacks: Adversarial images can control generative
+models at runtime. arXiv preprint arXiv:2309.00236, 2023.
+2
+[3] Long Chen, Oleg Sinavski, Jan H¨unermann, Alice Karnsund,
+Andrew James Willmott, Danny Birch, Daniel Maund, and
+Jamie Shotton. Driving with llms: Fusing object-level vec-
+tor modality for explainable autonomous driving. In ICRA,
+2024. 1, 2
+[4] Kenneth Ward Church. Word2vec. Natural Language Engi-
+neering, 2017. 4
+[5] Alexey Dosovitskiy, German Ros, Felipe Codevilla, Antonio
+Lopez, and Vladlen Koltun. Carla: An open urban driving
+simulator. In Conference on robot learning, 2017. 5
+[6] Sebastian Farquhar, Jannik Kossen, Lorenz Kuhn, and Yarin
+Gal. Detecting hallucinations in large language models using
+semantic entropy. Nature, 2024. 4
+[7] Sensen Gao, Xiaojun Jia, Xuhong Ren, Ivor Tsang, and Qing
+Guo. Boosting transferability in vision-language attacks via
+diversification along the intersection region of adversarial
+trajectory. In ECCV, 2025. 2
+[8] Tao Gong, Chengqi Lyu, Shilong Zhang, Yudong Wang,
+Miao Zheng, Qian Zhao, Kuikun Liu, Wenwei Zhang, Ping
+Luo, and Kai Chen.
+Multimodal-gpt: A vision and lan-
+guage model for dialogue with humans.
+arXiv preprint
+arXiv:2305.04790, 2023. 5, 6, 7
+[9] Ian J Goodfellow, Jonathon Shlens, and Christian Szegedy.
+Explaining and harnessing adversarial examples.
+arXiv
+preprint arXiv:1412.6572, 2014. 5, 6, 7
+[10] Jun Guo, Wei Bao, Jiakai Wang, Yuqing Ma, Xinghai Gao,
+Gang Xiao, Aishan Liu, Jian Dong, Xianglong Liu, and Wen-
+jun Wu. A comprehensive evaluation framework for deep
+model robustness. PR, 2023. 2
+[11] Bangyan He, Jian Liu, Yiming Li, Siyuan Liang, Jingzhi Li,
+Xiaojun Jia, and Xiaochun Cao. Generating transferable 3d
+adversarial point cloud via random perturbation factoriza-
+tion. In Proceedings of the AAAI Conference on Artificial
+Intelligence, 2023. 1
+[12] Wei Jiang, Tianyuan Zhang, Shuangcheng Liu, Weiyu Ji,
+Zichao Zhang, and Gang Xiao.
+Exploring the physical-
+world adversarial robustness of vehicle detection. Electron-
+ics, 2023. 2
+[13] Wei Jiang, Lu Wang, Tianyuan Zhang, Yuwei Chen, Jian
+Dong, Wei Bao, Zichao Zhang, and Qiang Fu. Robuste2e:
+Exploring the robustness of end-to-end autonomous driving.
+Electronics, 2024. 2
+[14] Dehong Kong, Siyuan Liang, and Wenqi Ren. Environmen-
+tal matching attack against unmanned aerial vehicles object
+detection. arXiv preprint arXiv:2405.07595, 2024. 1
+[15] Dehong Kong, Siyuan Liang, Xiaopeng Zhu, Yuansheng
+Zhong, and Wenqi Ren. Patch is enough: Naturalistic ad-
+versarial patch against vision-language pre-training models.
+arXiv preprint arXiv:2410.04884, 2024. 1
+[16] Simin Li, Shuning Zhang, Gujun Chen, Dong Wang, Pu
+Feng, Jiakai Wang, Aishan Liu, Xin Yi, and Xianglong Liu.
+Towards benchmarking and assessing visual naturalness of
+physical world adversarial attacks. In CVPR, 2023. 2
+[17] Siyuan Liang, Xingxing Wei, Siyuan Yao, and Xiaochun
+Cao. Efficient adversarial attacks for visual object tracking.
+In Computer Vision–ECCV 2020: 16th European Confer-
+ence, Glasgow, UK, August 23–28, 2020, Proceedings, Part
+XXVI 16, 2020. 1
+[18] Siyuan Liang, Xingxing Wei, and Xiaochun Cao. Generate
+more imperceptible adversarial examples for object detec-
+tion. In ICML, 2021.
+[19] Siyuan Liang, Longkang Li, Yanbo Fan, Xiaojun Jia, Jingzhi
+Li, Baoyuan Wu, and Xiaochun Cao. A large-scale multiple-
+objective method for black-box attack against object detec-
+tion. In European Conference on Computer Vision, 2022.
+[20] Siyuan Liang, Baoyuan Wu, Yanbo Fan, Xingxing Wei, and
+Xiaochun Cao. Parallel rectangle flip attack: A query-based
+black-box attack against object detection.
+arXiv preprint
+arXiv:2201.08970, 2022. 1
+[21] Siyuan Liang, Mingli Zhu, Aishan Liu, Baoyuan Wu,
+Xiaochun Cao, and Ee-Chien Chang.
+Badclip:
+Dual-
+embedding guided backdoor attack on multimodal con-
+trastive learning.
+arXiv preprint arXiv:2311.12075, 2023.
+2
+[22] Aishan Liu, Xianglong Liu, Jiaxin Fan, Yuqing Ma, Anlan
+Zhang, Huiyuan Xie, and Dacheng Tao. Perceptual-sensitive
+gan for generating adversarial patches. In AAAI, 2019. 2
+[23] Aishan Liu, Tairan Huang, Xianglong Liu, Yitao Xu, Yuqing
+Ma, Xinyun Chen, Stephen J Maybank, and Dacheng Tao.
+Spatiotemporal attacks for embodied agents.
+In ECCV,
+2020.
+[24] Aishan Liu, Jiakai Wang, Xianglong Liu, Bowen Cao,
+Chongzhi Zhang, and Hang Yu. Bias-based universal adver-
+sarial patch attack for automatic check-out. In ECCV, 2020.
+[25] Aishan Liu, Xianglong Liu, Hang Yu, Chongzhi Zhang,
+Qiang Liu, and Dacheng Tao.
+Training robust deep neu-
+ral networks via adversarial noise propagation. IEEE TIP,
+2021.
+[26] Aishan Liu, Jun Guo, Jiakai Wang, Siyuan Liang, Renshuai
+Tao, Wenbo Zhou, Cong Liu, Xianglong Liu, and Dacheng
+Tao. {X-Adv}: Physical adversarial object attacks against
+x-ray prohibited item detection. In USENIX, 2023. 1
+[27] Aishan Liu, Shiyu Tang, Xinyun Chen, Lei Huang, Haotong
+Qin, Xianglong Liu, and Dacheng Tao.
+Towards defend-
+ing multiple lp-norm bounded adversarial perturbations via
+gated batch normalization. IJCV, 2023.
+[28] Aishan Liu, Shiyu Tang, Siyuan Liang, Ruihao Gong, Boxi
+Wu, Xianglong Liu, and Dacheng Tao. Exploring the rela-
+tionship between architectural design and adversarially ro-
+bust generalization. In Proceedings of the IEEE/CVF Con-
+ference on Computer Vision and Pattern Recognition, 2023.
+2
+[29] Aishan Liu, Xinwei Zhang, Yisong Xiao, Yuguang Zhou,
+Siyuan Liang, Jiakai Wang, Xianglong Liu, Xiaochun Cao,
+and Dacheng Tao. Pre-trained trojan attacks for visual recog-
+nition. arXiv preprint arXiv:2312.15172, 2023. 2
+
+[30] Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee.
+Visual instruction tuning. NeurIPS, 2024. 5, 6, 7
+[31] Jiaqi Liu, Peng Hang, Xiao Qi, Jianqiang Wang, and Jian
+Sun. Mtd-gpt: A multi-task decision-making gpt model for
+autonomous driving at unsignalized intersections. In ITSC,
+2023. 2
+[32] Jiayang Liu, Siyu Zhu, Siyuan Liang, Jie Zhang, Han Fang,
+Weiming Zhang, and Ee-Chien Chang.
+Improving adver-
+sarial transferability by stable diffusion.
+arXiv preprint
+arXiv:2311.11017, 2023. 1
+[33] Shunchang Liu, Jiakai Wang, Aishan Liu, Yingwei Li, Yijie
+Gao, Xianglong Liu, and Dacheng Tao. Harnessing percep-
+tual adversarial patches for crowd counting. In ACM CCS,
+2022. 2
+[34] Tianrui Lou, Xiaojun Jia, Jindong Gu, Li Liu, Siyuan Liang,
+Bangyan He, and Xiaochun Cao. Hide in thicket: Gener-
+ating imperceptible and rational adversarial perturbations on
+3d point clouds. arXiv preprint arXiv:2403.05247, 2024. 1
+[35] Ke Ma, Qianqian Xu, Jinshan Zeng, Xiaochun Cao, and
+Qingming Huang. Poisoning attack against estimating from
+pairwise comparisons. IEEE Transactions on Pattern Analy-
+sis and Machine Intelligence, 44(10):6393–6408, 2021.
+[36] Ke Ma, Qianqian Xu, Jinshan Zeng, Guorong Li, Xiaochun
+Cao, and Qingming Huang. A tale of hodgerank and spectral
+method: Target attack against rank aggregation is the fixed
+point of adversarial game.
+IEEE Transactions on Pattern
+Analysis and Machine Intelligence, 45(4):4090–4108, 2022.
+[37] Ke Ma, Qianqian Xu, Jinshan Zeng, Wei Liu, Xiaochun Cao,
+Yingfei Sun, and Qingming Huang. Sequential manipula-
+tion against rank aggregation: theory and algorithm. IEEE
+TPAMI, 2024. 1
+[38] Yingzi Ma, Yulong Cao, Jiachen Sun, Marco Pavone, and
+Chaowei Xiao. Dolphins: Multimodal language model for
+driving. arXiv preprint arXiv:2312.00438, 2023. 2, 5, 6
+[39] Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt,
+Dimitris Tsipras, and Adrian Vladu. Towards deep learn-
+ing models resistant to adversarial attacks. arXiv preprint
+arXiv:1706.06083, 2017. 5, 6, 7, 8
+[40] Jiageng Mao, Yuxi Qian, Junjie Ye, Hang Zhao, and Yue
+Wang. Gpt-driver: Learning to drive with gpt. arXiv preprint
+arXiv:2310.01415, 2023. 1, 2
+[41] Ana-Maria Marcu, Long Chen, Jan H¨unermann, Alice Karn-
+sund, Benoit Hanotte, Prajwal Chidananda, Saurabh Nair,
+Vijay Badrinarayanan, Alex Kendall, Jamie Shotton, et al.
+Lingoqa: Video question answering for autonomous driving.
+arXiv preprint arXiv:2312.14115, 2023. 2
+[42] Ming Nie, Renyuan Peng, Chunwei Wang, Xinyue Cai,
+Jianhua Han, Hang Xu, and Li Zhang.
+Reason2drive:
+Towards interpretable and chain-based reasoning for au-
+tonomous driving. arXiv preprint arXiv:2312.03661, 2023.
+2
+[43] PIX Moving.
+Pixloop,
+2024.
+https : / / www .
+pixmoving.com/pixloop. 8
+[44] Takami Sato, Junjie Shen, Ningfei Wang, Yunhan Jia, Xue
+Lin, and Qi Alfred Chen.
+Dirty road can attack: Secu-
+rity of deep learning based automated lane centering under
+{Physical-World} attack. In USENIX, 2021. 8
+[45] Hao Shao, Yuxuan Hu, Letian Wang, Guanglu Song,
+Steven L Waslander, Yu Liu, and Hongsheng Li. Lmdrive:
+Closed-loop end-to-end driving with large language models.
+In CVPR, 2024. 1, 2, 5, 6
+[46] Chonghao Sima, Katrin Renz, Kashyap Chitta, Li Chen,
+Hanxue Zhang, Chengen Xie, Ping Luo, Andreas Geiger,
+and Hongyang Li. Drivelm: Driving with graph visual ques-
+tion answering. arXiv preprint arXiv:2312.14150, 2023. 2,
+5, 6
+[47] Haodi Wang, Kai Dong, Zhilei Zhu, Haotong Qin, Aishan
+Liu, Xiaolin Fang, Jiakai Wang, and Xianglong Liu. Trans-
+ferable multimodal attack on vision-language pre-training
+models. In S&P, 2024. 2
+[48] Jiakai Wang, Aishan Liu, Zixin Yin, Shunchang Liu, Shiyu
+Tang, and Xianglong Liu.
+Dual attention suppression at-
+tack: Generate adversarial camouflage in physical world. In
+CVPR, 2021. 2
+[49] Lu Wang, Tianyuan Zhang, Yikai Han, Muyang Fang, Ting
+Jin, and Jiaqi Kang. Attack end-to-end autonomous driving
+through module-wise noise. In CVPRW, 2024. 2
+[50] Wenhai Wang, Jiangwei Xie, ChuanYang Hu, Haoming Zou,
+Jianan Fan, Wenwen Tong, Yang Wen, Silei Wu, Hanming
+Deng, Zhiqi Li, et al. Drivemlm: Aligning multi-modal large
+language models with behavioral planning states for au-
+tonomous driving. arXiv preprint arXiv:2312.09245, 2023.
+2
+[51] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P
+Simoncelli. Image quality assessment: from error visibility
+to structural similarity. IEEE TIP, 2004. 5, 8
+[52] Zhiyuan Wang, Zeliang Zhang, Siyuan Liang, and Xiaosen
+Wang.
+Diversifying the high-level features for better ad-
+versarial transferability. arXiv preprint arXiv:2304.10136,
+2023. 1
+[53] Xingxing Wei, Siyuan Liang, Ning Chen, and Xiaochun Cao.
+Transferable adversarial attacks for image and video object
+detection. arXiv preprint arXiv:1811.12641, 2018. 1
+[54] Wenzhuo Xu, Kai Chen, Ziyi Gao, Zhipeng Wei, Jingjing
+Chen, and Yu-Gang Jiang.
+Highly transferable diffusion-
+based unrestricted adversarial attack on pre-trained vision-
+language models. In ACM MM, 2024. 2
+[55] Zhenhua Xu, Yujia Zhang, Enze Xie, Zhen Zhao, Yong Guo,
+Kwan-Yee K Wong, Zhenguo Li, and Hengshuang Zhao.
+Drivegpt4: Interpretable end-to-end autonomous driving via
+large language model. IEEE Robotics and Automation Let-
+ters, 2024. 1, 2
+[56] Ziyi Yin, Muchao Ye, Tianrong Zhang, Tianyu Du, Jinguo
+Zhu, Han Liu, Jinghui Chen, Ting Wang, and Fenglong Ma.
+Vlattack: Multimodal adversarial attacks on vision-language
+tasks via pre-trained models. Advances in Neural Informa-
+tion Processing Systems, 36, 2024. 1, 2
+[57] Zonghao Ying, Aishan Liu, Siyuan Liang, Lei Huang,
+Jinyang Guo, Wenbo Zhou, Xianglong Liu, and Dacheng
+Tao.
+Safebench:
+A safety evaluation framework for
+multimodal
+large
+language
+models.
+arXiv preprint
+arXiv:2410.18927, 2024.
+[58] Zonghao Ying, Aishan Liu, Tianyuan Zhang, Zhengmin Yu,
+Siyuan Liang, Xianglong Liu, and Dacheng Tao. Jailbreak
+
+vision language models via bi-modal adversarial prompt.
+arXiv preprint arXiv:2406.04031, 2024. 1, 2
+[59] Chongzhi Zhang, Aishan Liu, Xianglong Liu, Yitao Xu,
+Hang Yu, Yuqing Ma, and Tianlin Li. Interpreting and im-
+proving adversarial robustness of deep neural networks with
+neuron sensitivity. IEEE TIP, 2021. 2
+[60] Jiaming Zhang, Qi Yi, and Jitao Sang. Towards adversarial
+attack on vision-language pre-training models. In ACM MM,
+2022. 2
+[61] Jiaming Zhang, Junhong Ye, Xingjun Ma, Yige Li, Yunfan
+Yang, Jitao Sang, and Dit-Yan Yeung. Anyattack: Towards
+large-scale self-supervised generation of targeted adversar-
+ial examples for vision-language models.
+arXiv preprint
+arXiv:2410.05346, 2024. 2, 5, 6, 7, 8
+[62] Tianyuan Zhang, Yisong Xiao, Xiaoya Zhang, Hao Li,
+and Lu Wang.
+Benchmarking the physical-world ad-
+versarial robustness of vehicle detection.
+arXiv preprint
+arXiv:2304.05098, 2023. 2
+[63] Tianyuan Zhang, Lu Wang, Jiaqi Kang, Xinwei Zhang,
+Siyuan Liang, Yuwei Chen, Aishan Liu, and Xianglong Liu.
+Module-wise adaptive adversarial training for end-to-end au-
+tonomous driving. arXiv preprint arXiv:2409.07321, 2024.
+2
+[64] Tianyuan Zhang, Lu Wang, Hainan Li, Yisong Xiao, Siyuan
+Liang, Aishan Liu, Xianglong Liu, and Dacheng Tao.
+Lanevil: Benchmarking the robustness of lane detection to
+environmental illusions. arXiv preprint arXiv:2406.00934,
+2024. 2
+[65] Xinwei Zhang, Aishan Liu, Tianyuan Zhang, Siyuan Liang,
+and Xianglong Liu. Towards robust physical-world backdoor
+attacks on lane detection. arXiv preprint arXiv:2405.05553,
+2024. 2
+[66] Yunqing Zhao, Tianyu Pang, Chao Du, Xiao Yang, Chongx-
+uan Li, Ngai-Man Man Cheung, and Min Lin. On evaluat-
+ing adversarial robustness of large vision-language models.
+NeurIPS, 2024. 2, 5, 6, 7, 8
+[67] Ziqi Zhou, Shengshan Hu, Minghui Li, Hangtao Zhang,
+Yechao Zhang, and Hai Jin. Advclip: Downstream-agnostic
+adversarial examples in multimodal contrastive learning. In
+ACM MM, 2023. 2
+[68] Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mo-
+hamed Elhoseiny.
+Minigpt-4: Enhancing vision-language
+understanding with advanced large language models. arXiv
+preprint arXiv:2304.10592, 2023. 5, 6, 7
+

@@ -1,0 +1,90 @@
+{
+  "slides": [
+    {
+      "id": "01-intro",
+      "title": "Intro",
+      "order": 1,
+      "url": "/slides/01.json",
+      "subtitle": "Vision, problem, and opportunity",
+      "steps": [
+        {
+          "number": 1,
+          "heading": "Mission",
+          "body_markdown": "Our mission is to simplify complex workflows with **intelligent automation** that scales across teams."
+        },
+        {
+          "number": 2,
+          "heading": "Customer Pain",
+          "body_markdown": "Teams spend excessive time on manual coordination, causing delays and high operational costs.\n\nThis creates a clear opener for automation and visibility tools."
+        },
+        {
+          "number": 3,
+          "heading": "Why Now",
+          "body_markdown": "Rapid adoption of cloud platforms and AI-driven tooling makes automation both feasible and expected by customers."
+        }
+      ]
+    },
+    {
+      "id": "02-growth",
+      "title": "Growth Strategy",
+      "order": 2,
+      "url": "/slides/02.json",
+      "subtitle": "How we acquire and retain customers",
+      "steps": [
+        {
+          "number": 1,
+          "heading": "Target Segments",
+          "body_markdown": "Mid-market technology, finance, and logistics teams that manage high-volume operational workflows."
+        },
+        {
+          "number": 2,
+          "heading": "Acquisition Channels",
+          "body_markdown": "**Inbound content & SEO**, targeted paid campaigns, and channel partnerships.\n\nPilot programs with strategic customers to build case studies."
+        },
+        {
+          "number": 3,
+          "heading": "Monetization",
+          "body_markdown": "Subscription tiers with usage-based metering and an enterprise plan for integrations and SSO."
+        },
+        {
+          "number": 4,
+          "heading": "Retention",
+          "body_markdown": "Strong onboarding, in-product analytics, and a customer success program to drive expansion."
+        }
+      ]
+    },
+    {
+      "id": "03-tech",
+      "title": "Technical Priorities",
+      "order": 3,
+      "url": "/slides/03.json",
+      "subtitle": "Roadmap to reliable, scalable infrastructure",
+      "steps": [
+        {
+          "number": 1,
+          "heading": "Stability & Scale",
+          "body_markdown": "Migrate core services to resilient, horizontally-scalable microservices and add observability."
+        },
+        {
+          "number": 2,
+          "heading": "Performance",
+          "body_markdown": "Optimize API latency, introduce edge caching, and implement async processing for heavy jobs."
+        },
+        {
+          "number": 3,
+          "heading": "Security & Compliance",
+          "body_markdown": "Harden encryption-at-rest/in-transit, complete SOC 2 readiness, and add role-based access controls."
+        },
+        {
+          "number": 4,
+          "heading": "Product Innovation",
+          "body_markdown": "Ship AI-assisted automation builders and expand the public API for integrators.",
+          "image": {
+            "src": "https://example.com/roadmap-screenshot.jpg",
+            "alt": "Technical roadmap mockup"
+          }
+        }
+      ]
+    }
+  ]
+}

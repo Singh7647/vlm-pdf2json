@@ -1,0 +1,13 @@
+Slide
+ ├── id
+ ├── title
+ ├── subtitle
+ └── steps[]
+       ├── number
+       ├── heading
+       ├── body_markdown
+       └── image (optional)
+
+
+
+
