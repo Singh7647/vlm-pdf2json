@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 ## Hardcoded Paths to Update
 
-Open `get_inidv_image_bounding_boxes.py` and update the following:
+Open `extract_images.py` and update the following:
 
 | Variable | Line | Description |
 |---|---|---|
@@ -30,7 +30,7 @@ Place your PDF files in any local folder, then pass the path as an argument when
 **Recommended structure:**
 ```
 project/
-├── get_inidv_image_bounding_boxes.py
+├── extract_images.py
 ├── requirements.txt
 ├── input_pdfs/          ← put your PDFs here
 │   ├── paper1.pdf
@@ -44,19 +44,19 @@ project/
 
 **Single PDF:**
 ```bash
-python get_inidv_image_bounding_boxes.py input_pdfs/paper1.pdf
+python extract_images.py input_pdfs/paper1.pdf
 ```
 
 **Entire folder of PDFs:**
 ```bash
-python get_inidv_image_bounding_boxes.py input_pdfs/
+python extract_images.py input_pdfs/
 ```
 
 **With optional parameters:**
 ```bash
-python get_inidv_image_bounding_boxes.py input_pdfs/paper1.pdf [proximity] [min_area] [caption_scan]
+python extract_images.py input_pdfs/paper1.pdf [proximity] [min_area] [caption_scan]
 # Example:
-python get_inidv_image_bounding_boxes.py input_pdfs/paper1.pdf 20 2000 30
+python extract_images.py input_pdfs/paper1.pdf 20 2000 30
 ```
 
 | Parameter | Default | Description |
